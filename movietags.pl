@@ -4,7 +4,6 @@
 use warnings;
 use Data::Dumper;
 use WWW::TheMovieDB;
-use IMDB::Film;
 use JSON -support_by_pp;
 use File::Basename;
 use File::Path;
@@ -47,6 +46,7 @@ my %title_hash = ();
 my @titles;
 my $index = 0;
 my $movie;
+my $releases;
 
 my $api = new WWW::TheMovieDB({
 	'key'		=>	$api_key,
@@ -112,6 +112,9 @@ if ($tmdb_id) {
 	$movie = $api->Movies::info({
 		'movie_id' => $tmdb_id
 	});
+	$releases = $api->Movies::releases({
+		'movie_id' => $tmdb_id
+	});
 } else {
 	print "Unable to lookup the movie, no TMDB ID was found.\n";
 	exit(1);
@@ -136,10 +139,14 @@ my $ff = File::Fetch->new(uri => "$art");
 my $where = $ff->fetch() or die $ff->error;
 my $artwork = $ff->output_file;
 my $runtime = $movie_info->{runtime};
-my $imdb = new IMDB::Film(crit => $imdb_id);
-my $kind = ucfirst($imdb->kind());
-my $rating = $imdb->mpaa_info();
-my ($null, $mpaa_rating) = split('\s+', $rating);
+my $movie_releases = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($releases);
+foreach my $country (@{$movie_releases->{countries}}) {
+	if ($country->{iso_3166_1} eq "US") {
+		$mpaa_rating = $country->{certification};
+	}	
+}
+
+my $kind = "Movie";
 # If the mpaa_rating comes back null then assign an Unrated tag to the movie. 
 # Not ideal but works for now. 
 if (!$mpaa_rating) {
