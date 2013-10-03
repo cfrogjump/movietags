@@ -123,11 +123,23 @@ if ($tmdb_id) {
 # Begin parsing out the movie tagging information.
 my $movie_info = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($movie);
 my $genre = $movie_info->{genres};
+#my $genres = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($genre);
 my $imdb_id = $movie_info->{imdb_id};
 my $title = $movie_info->{title};
 my $release_date = $movie_info->{release_date};
 my $tagline = $movie_info->{tagline};
 
+#print Dumper($genre);
+#foreach my $g (@genre) {
+#	print $g->{name} . "\n";
+#}
+
+#print Dumper(@genre);
+#for my $genres ( $genre->{name} ) {
+#	print $genres . "\n";
+##	$Genre .= $genres . ",";
+#}
+#$Genre =~ s/,$//g;
 # Manipulate the movie description to enable proper tagging.
 $movie_info->{overview} =~ s/\"/\\\"/g;
 $movie_info->{overview} =~ s/\&amp\;/\&/g;
@@ -157,6 +169,7 @@ if (!$mpaa_rating) {
 if ($verbose) {
 	print "\n************************************************************************\n";
 	print "\n";
+	print "Genre:\t\t$Genre\n";
 	print "Title:\t\t$title\n";
 	print "IMDB ID:\t$imdb_id\n";
 	print "Release Date:\t$release_date\n";
@@ -193,3 +206,9 @@ system("@command") == 0
 # Cleanup after ourselves, removing downloaded artwork.	
 system("rm -f $artwork") == 0
 	or die "system rm failed: $?";
+
+# Set the files modification date to match the release date for sorting purposes. 
+$release_date =~ s/-//g;
+$release_date = $release_date . "1200";
+system ("touch -t $release_date \"$file\"") == 0
+	or die "touch failed: $?";
