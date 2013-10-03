@@ -161,7 +161,7 @@ foreach my $country (@{$movie_releases->{countries}}) {
 my $kind = "Movie";
 # If the mpaa_rating comes back null then assign an Unrated tag to the movie. 
 # Not ideal but works for now. 
-if (!$mpaa_rating) {
+if (!$mpaa_rating || $mpaa_rating eq "NR") {
 	$mpaa_rating = "Unrated";
 }
 
