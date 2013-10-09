@@ -33,10 +33,17 @@ my $logfile = "/Users/cade/movietags.log"; # Define location of log file for err
 # Determine the Title of the movie from the filename. 
 my $file = $ARGV[0];
 my ($filename, $directories) = fileparse("$file");
-my ($name,$date) = split('\ \(', $filename);
+my ($name,$date) = split('\s+\(', $filename);
+if (!$date) {
+	($name,$date) = split('\(', $filename);
+}
+$name =~ s/\s+-\s+//g;
+$name =~ s/[Uu]nrated//g;
+
 if (!$date) {
 	print "Movie files must be named <movie name> (<release year>).<ext>\n";
 	print "Please rename the file to match the naming convention.\n";
+	print "Filename: $file\n";
 	exit;
 }
 my ($release) = split('\)', $date);
@@ -64,32 +71,54 @@ my $list = $api->Search::movie({
 my $json = new JSON;
 my $json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
 
+if (!@{$json_text->{results}}) {
+	$list = $api->Search::movie({
+		'query' => "$name"
+	});
+	$json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
+	#print "No Results found.\n";
+}
+
 # Process through the list of movies returned in the search and try to match based on file Title and Year. If no match is found
 # then revert to user input. 
 foreach my $title (@{$json_text->{results}}) {
 	if ($debug) {
 		print $name . "\n";
-		print $title->{original_title} . "\n";
+		print $title->{title} . "\n";
 	}
-	push @titles, {title => $title->{original_title}, release_date => $title->{release_date}, tmdb_id => $title->{id}};
-	$title->{original_title} =~ s/[#\-%\$*+():].//g;
+	push @titles, {title => $title->{title}, release_date => $title->{release_date}, tmdb_id => $title->{id}};
+	$title->{title} =~ s/[#\-%\$*+():].//g;
 	$name =~ s/[#\-%\$*+():].//g;
 	if ($debug) {
-		print $title->{original_title} . "\n";
+		print $title->{title} . "\n";
 		print $name . "\n";
 		print $release . "\n";
 		print $title->{release_date} . "\n";
 	}
-	if ($title->{original_title} =~ "&" && $name !~ "&") {
-		$title->{original_title} =~ s/\&/and/g;
+	if ($title->{title} =~ "&" && $name !~ "&") {
+		$title->{title} =~ s/\&/and/g;
 	}
-	if (lc($title->{original_title}) eq lc("$name") && $title->{release_date} =~ "$release") {
+#	if (lc($title->{title}) eq lc($name)) {
+#		print "Titles match!\n";
+#	} else {
+#		print "Titles don't match\n";
+#		print "$title->{title}\n";
+#		print "$name\n";
+#	}
+#	if ($title->{release_date} =~ $release) {
+#		print "Release dates match!\n";
+#	} else {
+#		print "Release dates don't match\n";
+#	}
+	
+	if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
 		$tmdb_id = $title->{id};
 	}
 
 }
 if (!$automate) {
 	if (!$tmdb_id) {
+		print "\nFilename: $file\n\n";
 		print "Please select a number from the list below:\n\n";
 		foreach my $title (@titles) {
 			print "$index) " . $title->{title} . " released on " . $title->{release_date} . "\n";
@@ -169,7 +198,7 @@ if (!$mpaa_rating || $mpaa_rating eq "NR") {
 if ($verbose) {
 	print "\n************************************************************************\n";
 	print "\n";
-	print "Genre:\t\t$Genre\n";
+#	print "Genre:\t\t$Genre\n";
 	print "Title:\t\t$title\n";
 	print "IMDB ID:\t$imdb_id\n";
 	print "Release Date:\t$release_date\n";
@@ -184,8 +213,15 @@ if ($verbose) {
 }
 
 # Generate the actual MP4Tagger command. 
+$file =~ s/\ /\\\ /g;
+$file =~ s/\'/\\\'/g;
+$file =~ s/\(/\\\(/g;
+$file =~ s/\)/\\\)/g;
+$file =~ s/\,/\\\,/g;
+$file =~ s/\:/\\\:/g;
+$file =~ s/\&/\\\&/g;
 push(@command, "$mp4tagger");
-push(@command, "-i \'$file\'");
+push(@command, "-i $file");
 push(@command, "--media_kind \"$kind\"");
 if ($artwork) {
 	push(@command, "--artwork \"$artwork\"");
@@ -193,7 +229,7 @@ if ($artwork) {
 	print "\n\n\tWARNING: THIS FILE WILL NOT CONTAIN ANY COVER ART, NO IMAGE FILE WAS FOUND!\n\n";
 }
 push(@command, "--is_hd_video $HD");
-push(@command, "--name \'$title\'");
+push(@command, "--name \"$title\"");
 push(@command, "--release_date \"$release_date\"");
 if ($mpaa_rating) {
 	push(@command, "--rating \"$mpaa_rating\"");
@@ -210,5 +246,5 @@ system("rm -f $artwork") == 0
 # Set the files modification date to match the release date for sorting purposes. 
 $release_date =~ s/-//g;
 $release_date = $release_date . "1200";
-system ("touch -t $release_date \"$file\"") == 0
+system ("touch -t $release_date $file") == 0
 	or die "touch failed: $?";
