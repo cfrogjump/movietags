@@ -76,11 +76,11 @@ if (!@{$json_text->{results}}) {
 		'query' => "$name"
 	});
 	$json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
-	#print "No Results found.\n";
 }
 
 # Process through the list of movies returned in the search and try to match based on file Title and Year. If no match is found
 # then revert to user input. 
+my $match = "0";
 foreach my $title (@{$json_text->{results}}) {
 	if ($debug) {
 		print $name . "\n";
@@ -98,26 +98,16 @@ foreach my $title (@{$json_text->{results}}) {
 	if ($title->{title} =~ "&" && $name !~ "&") {
 		$title->{title} =~ s/\&/and/g;
 	}
-#	if (lc($title->{title}) eq lc($name)) {
-#		print "Titles match!\n";
-#	} else {
-#		print "Titles don't match\n";
-#		print "$title->{title}\n";
-#		print "$name\n";
-#	}
-#	if ($title->{release_date} =~ $release) {
-#		print "Release dates match!\n";
-#	} else {
-#		print "Release dates don't match\n";
-#	}
-	
 	if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
 		$tmdb_id = $title->{id};
+		$match++;
 	}
 
 }
+
+print "Match: $match\n";
 if (!$automate) {
-	if (!$tmdb_id) {
+	if (!$tmdb_id || $match > "1") {
 		print "\nFilename: $file\n\n";
 		print "Please select a number from the list below:\n\n";
 		foreach my $title (@titles) {
