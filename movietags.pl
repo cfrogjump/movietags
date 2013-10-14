@@ -37,7 +37,13 @@ my ($name,$date) = split('\s+\(', $filename);
 if (!$date) {
 	($name,$date) = split('\(', $filename);
 }
-$name =~ s/\s+-\s+//g;
+
+if ($name =~ m/[A-Z0-9a-z]\s+-\s+[A-Z0-9a-z]/) {
+	$name =~ s/\s+-\s+/\ /g;
+} elsif ($name =~ m/[A-Z0-9a-z]\s+-\s+\./) {
+	$name =~ s/[A-Z0-9a-z]\s+-\s+\.//g;
+}
+
 $name =~ s/[Uu]nrated//g;
 
 if (!$date) {
@@ -65,7 +71,8 @@ my $api = new WWW::TheMovieDB({
 
 # Search for the movie in TMDB.org
 my $list = $api->Search::movie({
-	'query' => "$name"
+	'query' => "$name",
+	'year' => "$release"
 });
 
 my $json = new JSON;
@@ -78,6 +85,12 @@ if (!@{$json_text->{results}}) {
 	$json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
 }
 
+if (!@{$json_text->{results}}) {
+	print "No title found by that name.\n";
+	print "Filename: " . $file . "\n";
+	exit(1);
+}
+
 # Process through the list of movies returned in the search and try to match based on file Title and Year. If no match is found
 # then revert to user input. 
 my $match = "0";
@@ -87,8 +100,15 @@ foreach my $title (@{$json_text->{results}}) {
 		print $title->{title} . "\n";
 	}
 	push @titles, {title => $title->{title}, release_date => $title->{release_date}, tmdb_id => $title->{id}};
-	$title->{title} =~ s/[#\-%\$*+():].//g;
-	$name =~ s/[#\-%\$*+():].//g;
+	if ($title->{title} =~ m/\//) {
+		$title->{title} =~ s/[#\-%\$*+():\/]/\ /g;
+	} else {
+		$title->{title} =~ s/[#\-%\$*+():]./\ /g;	
+	}
+	$name =~ s/[#\-%\$*+():]./\ /g;
+	if ($title->{title} =~ m/[ \t]{2,}/) {
+		$title->{title} =~ s/[ \t]{2,}/ /g;
+	}
 	if ($debug) {
 		print $title->{title} . "\n";
 		print $name . "\n";
@@ -98,6 +118,8 @@ foreach my $title (@{$json_text->{results}}) {
 	if ($title->{title} =~ "&" && $name !~ "&") {
 		$title->{title} =~ s/\&/and/g;
 	}
+#	print "Title: " . lc($title->{title}) . "\n";
+#	print "Name: " . lc($name) . "\n";
 	if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
 		$tmdb_id = $title->{id};
 		$match++;
@@ -108,16 +130,31 @@ foreach my $title (@{$json_text->{results}}) {
 print "Match: $match\n";
 if (!$automate) {
 	if (!$tmdb_id || $match > "1") {
-		print "\nFilename: $file\n\n";
-		print "Please select a number from the list below:\n\n";
-		foreach my $title (@titles) {
-			print "$index) " . $title->{title} . " released on " . $title->{release_date} . "\n";
-			$index++;
+		$min_year = ($release - 2);
+		$max_year = ($release + 2);
+		foreach my $cleanup (@titles) {
+			if ($cleanup->{release_date} ge "$min_year" && $cleanup->{release_date} le "$max_year") {
+				push @closeTitles, {title => $cleanup->{title}, release_date => $cleanup->{release_date}, tmdb_id => $cleanup->{tmdb_id}};
+			}
 		}
-		print "\n";
-		print "Which would you like to select? ";
-		my $input = <STDIN>;
-		$tmdb_id = $titles[$input]->{tmdb_id};
+#		print Dumper(@titles);
+		if (scalar @closeTitles eq "1") {
+#			print Dumper(@closeTitles);
+			$tmdb_id = $closeTitles[0]->{tmdb_id};
+		} else {
+		
+#		print Dumper(@closeTitles);
+			print "\nFilename: $file\n\n";
+			print "Please select a number from the list below:\n\n";
+			foreach my $title (@closeTitles) {
+				print "$index) " . $title->{title} . " released on " . $title->{release_date} . "\n";
+				$index++;
+			}
+			print "\n";
+			print "Which would you like to select? ";
+			my $input = <STDIN>;
+			$tmdb_id = $titles[$input]->{tmdb_id};
+		}
 	}
 } elsif ($automate) {
 	open (FILE, ">>$logfile") or die "Cannot open $logfile";
