@@ -43,7 +43,6 @@ if ($name =~ m/[A-Z0-9a-z]\s+-\s+[A-Z0-9a-z]/) {
 } elsif ($name =~ m/[A-Z0-9a-z]\s+-\s+\./) {
 	$name =~ s/[A-Z0-9a-z]\s+-\s+\.//g;
 }
-
 $name =~ s/[Uu]nrated//g;
 
 if (!$date) {
@@ -118,8 +117,6 @@ foreach my $title (@{$json_text->{results}}) {
 	if ($title->{title} =~ "&" && $name !~ "&") {
 		$title->{title} =~ s/\&/and/g;
 	}
-#	print "Title: " . lc($title->{title}) . "\n";
-#	print "Name: " . lc($name) . "\n";
 	if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
 		$tmdb_id = $title->{id};
 		$match++;
@@ -127,7 +124,6 @@ foreach my $title (@{$json_text->{results}}) {
 
 }
 
-print "Match: $match\n";
 if (!$automate) {
 	if (!$tmdb_id || $match > "1") {
 		$min_year = ($release - 2);
@@ -137,13 +133,10 @@ if (!$automate) {
 				push @closeTitles, {title => $cleanup->{title}, release_date => $cleanup->{release_date}, tmdb_id => $cleanup->{tmdb_id}};
 			}
 		}
-#		print Dumper(@titles);
+		# If there is only 1 result just assume that it is the one we want.
 		if (scalar @closeTitles eq "1") {
-#			print Dumper(@closeTitles);
 			$tmdb_id = $closeTitles[0]->{tmdb_id};
 		} else {
-		
-#		print Dumper(@closeTitles);
 			print "\nFilename: $file\n\n";
 			print "Please select a number from the list below:\n\n";
 			foreach my $title (@closeTitles) {
@@ -196,6 +189,7 @@ my $tagline = $movie_info->{tagline};
 ##	$Genre .= $genres . ",";
 #}
 #$Genre =~ s/,$//g;
+
 # Manipulate the movie description to enable proper tagging.
 $movie_info->{overview} =~ s/\"/\\\"/g;
 $movie_info->{overview} =~ s/\&amp\;/\&/g;
@@ -246,6 +240,7 @@ $file =~ s/\(/\\\(/g;
 $file =~ s/\)/\\\)/g;
 $file =~ s/\,/\\\,/g;
 $file =~ s/\:/\\\:/g;
+$file =~ s/\;/\\\;/g;
 $file =~ s/\&/\\\&/g;
 push(@command, "$mp4tagger");
 push(@command, "-i $file");
