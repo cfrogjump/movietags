@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-#use strict;
+use strict;
 use warnings;
 use Data::Dumper;
 use WWW::TheMovieDB;
@@ -12,8 +12,6 @@ use Cwd;
 
 if ($#ARGV != 0) {
 	print "Usage: movietags.pl <movie file>\n";
-	print "Movie files must be named <movie name> (release year).<ext>\n";
-	print "ex. Aladdin (1992).m4v\n";
 	exit;
 }
 ######################################################################
@@ -32,12 +30,18 @@ my $logfile = "/Users/cade/movietags.log"; # Define location of log file for err
 
 # Determine the Title of the movie from the filename. 
 my $file = $ARGV[0];
+my $name;
+my $date;
 my ($filename, $directories) = fileparse("$file");
-my ($name,$date) = split('\s+\(', $filename);
-if (!$date) {
-	($name,$date) = split('\(', $filename);
+if ($filename =~ m/\([0-9]{4,}\)/) {
+	($name,$date) = split('\s+\(', $filename);
+	if (!$date) {
+		($name,$date) = split('\(', $filename);
+	}
+} else {
+	$name = $filename;
+	$name =~ s/.m4v//g;
 }
-
 if ($name =~ m/[A-Z0-9a-z]\s+-\s+[A-Z0-9a-z]/) {
 	$name =~ s/\s+-\s+/\ /g;
 } elsif ($name =~ m/[A-Z0-9a-z]\s+-\s+\./) {
@@ -45,13 +49,10 @@ if ($name =~ m/[A-Z0-9a-z]\s+-\s+[A-Z0-9a-z]/) {
 }
 $name =~ s/[Uu]nrated//g;
 
-if (!$date) {
-	print "Movie files must be named <movie name> (<release year>).<ext>\n";
-	print "Please rename the file to match the naming convention.\n";
-	print "Filename: $file\n";
-	exit;
+my $release;
+if ($date) {
+	($release) = split('\)', $date);
 }
-my ($release) = split('\)', $date);
 my @command;
 my $tmdb_id;
 my %title_hash = ();
@@ -59,6 +60,18 @@ my @titles;
 my $index = 0;
 my $movie;
 my $releases;
+my $casts;
+my @closeTitles;
+my @cast;
+my @director;
+my @writers;
+my @composer;
+my @producer;
+my @genres;
+my $mpaa_rating;
+my $list;
+my $json;
+my $json_text;
 
 my $api = new WWW::TheMovieDB({
 	'key'		=>	$api_key,
@@ -69,13 +82,20 @@ my $api = new WWW::TheMovieDB({
 });
 
 # Search for the movie in TMDB.org
-my $list = $api->Search::movie({
-	'query' => "$name",
-	'year' => "$release"
-});
-
-my $json = new JSON;
-my $json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
+if ($release) {
+	$list = $api->Search::movie({
+		'query' => "$name",
+		'year' => "$release"
+	});
+	$json = new JSON;
+	$json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
+} else {
+	$list = $api->Search::movie({
+		'query' => "$name"
+	});
+	$json = new JSON;
+	$json_text = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($list);
+}
 
 if (!@{$json_text->{results}}) {
 	$list = $api->Search::movie({
@@ -117,28 +137,43 @@ foreach my $title (@{$json_text->{results}}) {
 	if ($title->{title} =~ "&" && $name !~ "&") {
 		$title->{title} =~ s/\&/and/g;
 	}
-	if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
-		$tmdb_id = $title->{id};
-		$match++;
+	if ($release) {
+		if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
+			$tmdb_id = $title->{id};
+			$match++;
+		}
+	} else {
+		if (lc($title->{title}) eq lc($name)) {
+			$tmdb_id = $title->{id};
+			$match++;
+		}
 	}
+	
 
 }
 
 if (!$automate) {
 	if (!$tmdb_id || $match > "1") {
-		$min_year = ($release - 2);
-		$max_year = ($release + 2);
-		foreach my $cleanup (@titles) {
-			if ($cleanup->{release_date} ge "$min_year" && $cleanup->{release_date} le "$max_year") {
+		if ($release) {
+			my $min_year = ($release - 2);
+			my $max_year = ($release + 2);
+			foreach my $cleanup (@titles) {
+				if ($cleanup->{release_date} ge "$min_year" && $cleanup->{release_date} le "$max_year") {
+					push @closeTitles, {title => $cleanup->{title}, release_date => $cleanup->{release_date}, tmdb_id => $cleanup->{tmdb_id}};
+				}
+			}
+		} else {
+			foreach my $cleanup (@titles) {
 				push @closeTitles, {title => $cleanup->{title}, release_date => $cleanup->{release_date}, tmdb_id => $cleanup->{tmdb_id}};
 			}
 		}
+		
 		# If there is only 1 result just assume that it is the one we want.
 		if (scalar @closeTitles eq "1") {
 			$tmdb_id = $closeTitles[0]->{tmdb_id};
 		} else {
 			print "\nFilename: $file\n\n";
-			print "Please select a number from the list below:\n\n";
+			print "Please select a match from the list below:\n\n";
 			foreach my $title (@closeTitles) {
 				print "$index) " . $title->{title} . " released on " . $title->{release_date} . "\n";
 				$index++;
@@ -164,6 +199,9 @@ if ($tmdb_id) {
 	$releases = $api->Movies::releases({
 		'movie_id' => $tmdb_id
 	});
+	$casts = $api->Movies::casts({
+		'movie_id' => $tmdb_id
+	});
 } else {
 	print "Unable to lookup the movie, no TMDB ID was found.\n";
 	exit(1);
@@ -172,23 +210,37 @@ if ($tmdb_id) {
 # Begin parsing out the movie tagging information.
 my $movie_info = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($movie);
 my $genre = $movie_info->{genres};
-#my $genres = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($genre);
 my $imdb_id = $movie_info->{imdb_id};
 my $title = $movie_info->{title};
 my $release_date = $movie_info->{release_date};
 my $tagline = $movie_info->{tagline};
 
-#print Dumper($genre);
-#foreach my $g (@genre) {
-#	print $g->{name} . "\n";
-#}
+# Populate the cast and crew information
+my $cast_info = $json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($casts);
+foreach my $c (@{$cast_info->{cast}}) {
+	push (@cast, $c->{name});
+}
+my $cast_list = join(',', @cast);
+foreach my $crew (@{$cast_info->{crew}}) {
+	if ($crew->{job} eq "Director") {
+		push (@director, $crew->{name});
+	} elsif ($crew->{job} eq "Screenplay") {
+		push (@writers, $crew->{name});
+	} elsif ($crew->{job} eq "Original Music Composer") {
+		push (@composer, $crew->{name});
+	} elsif ($crew->{job} eq "Producer") {
+		push (@producer, $crew->{name});
+	}
+}
+my $director = join(',', @director);
+my $writer = join(',', @writers);
+my $composer = join(',', @composer);
+my $producer = join(',', @producer);
 
-#print Dumper(@genre);
-#for my $genres ( $genre->{name} ) {
-#	print $genres . "\n";
-##	$Genre .= $genres . ",";
-#}
-#$Genre =~ s/,$//g;
+foreach my $g (@{$genre}) {
+	push(@genres, $g->{name});
+}
+my $genres = join(",", @genres);
 
 # Manipulate the movie description to enable proper tagging.
 $movie_info->{overview} =~ s/\"/\\\"/g;
@@ -219,16 +271,21 @@ if (!$mpaa_rating || $mpaa_rating eq "NR") {
 if ($verbose) {
 	print "\n************************************************************************\n";
 	print "\n";
-#	print "Genre:\t\t$Genre\n";
 	print "Title:\t\t$title\n";
 	print "IMDB ID:\t$imdb_id\n";
 	print "Release Date:\t$release_date\n";
+	print "Genre:\t\t$genres\n";
 	print "Tagline:\t$tagline\n";
 	print "Overview:\t$overview\n";
 	print "Artwork:\t" . $artwork . "\n";
 	print "Runtime:\t$runtime mins.\n";
 	print "Kind:\t\t$kind\n";
 	print "Rating:\t\t$mpaa_rating\n";
+	print "Cast:\t\t$cast_list\n";
+	print "Director:\t$director\n";
+	print "Writer:\t\t$writer\n";
+	print "Composer:\t$composer\n";
+	print "Producer:\t$producer\n";
 	print "\n";
 	print "************************************************************************\n";
 }
@@ -257,6 +314,24 @@ if ($mpaa_rating) {
 	push(@command, "--rating \"$mpaa_rating\"");
 }
 push(@command, "--description \"$overview\"");
+if ($cast_list) {
+	push(@command, "--cast \"$cast_list\"");
+}
+if ($director) {
+	push(@command, "--director \"$director\"");
+}
+if ($writer) {
+	push(@command, "--screenwriters \"$writer\"");
+}
+if ($composer) {
+	push(@command, "--composer \"$composer\"");
+}
+if ($producer) {
+	push(@command, "--producer \"$producer\"");
+}
+if ($genres) {
+	push(@command, "--genre \"$genres\"");
+}
 
 system("@command") == 0
 	or die "system @command failed: $?";
