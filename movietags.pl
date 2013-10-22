@@ -136,6 +136,8 @@ foreach my $title (@{$json_text->{results}}) {
 	}
 	if ($title->{title} =~ "&" && $name !~ "&") {
 		$title->{title} =~ s/\&/and/g;
+	} elsif ($name =~ "&" && $title->{title} !~ "&") {
+		$name =~ s/\&/and/g;
 	}
 	if ($release) {
 		if (lc($title->{title}) eq lc($name) && $title->{release_date} =~ "$release") {
