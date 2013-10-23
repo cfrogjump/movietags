@@ -150,9 +150,9 @@ foreach my $title (@{$json_text->{results}}) {
 			$match++;
 		}
 	}
-	
-
 }
+
+#print "TMDB: $match\n";
 
 if (!$automate) {
 	if (!$tmdb_id || $match > "1") {
@@ -186,7 +186,10 @@ if (!$automate) {
 			$tmdb_id = $titles[$input]->{tmdb_id};
 		}
 	}
-} elsif ($automate) {
+} 
+
+if ($match gt "1" && $automate eq "1") {
+	print "Unable to tag $file\n";
 	open (FILE, ">>$logfile") or die "Cannot open $logfile";
 	print FILE "Unable to automatically tag file $file\n";
 	close(FILE);
@@ -270,7 +273,7 @@ if (!$mpaa_rating || $mpaa_rating eq "NR") {
 }
 
 # Output on screen the values that will be tagged. 
-if ($verbose) {
+if ($verbose && $automate != "1") {
 	print "\n************************************************************************\n";
 	print "\n";
 	print "Title:\t\t$title\n";
