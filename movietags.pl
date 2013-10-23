@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use WWW::TheMovieDB;
+use Mediainfo;
 use JSON -support_by_pp;
 use File::Basename;
 use File::Path;
@@ -14,10 +15,10 @@ if ($#ARGV != 0) {
 	print "Usage: movietags.pl <movie file>\n";
 	exit;
 }
+
 ######################################################################
 # Edit these variables if needed.
 ######################################################################
-my $HD = "yes"; # Assumption that the file you're tagging is HD, set to no if it is not. 
 my $api_key = "6746566f020dc17b63a1f7e9bd7843e8"; # TMDB api key, register an account on www.themoviedb.org to get your own.
 my $mp4tagger = "MP4Tagger"; # Define the location of the MP4Tagger binary
 my $debug = 0; # Set to 1 if you want to enable debugging in the script output.
@@ -72,6 +73,15 @@ my $mpaa_rating;
 my $list;
 my $json;
 my $json_text;
+my $HD;
+my $mediainfo_url = "http://mediaarea.net/en/MediaInfo/Download/Mac_OS";
+
+if (!`which mediainfo`) {
+	print "Mediainfo binary isn't installed. Please download and install the mediainfo cli binary.\n";
+	print "Mediainfo is required to determine if the file is HD or SD.\n";
+	`open $mediainfo_url`;
+	exit;
+}
 
 my $api = new WWW::TheMovieDB({
 	'key'		=>	$api_key,
@@ -151,8 +161,6 @@ foreach my $title (@{$json_text->{results}}) {
 		}
 	}
 }
-
-#print "TMDB: $match\n";
 
 if (!$automate) {
 	if (!$tmdb_id || $match > "1") {
@@ -272,6 +280,15 @@ if (!$mpaa_rating || $mpaa_rating eq "NR") {
 	$mpaa_rating = "Unrated";
 }
 
+# Determine if the file your tagging is HD or SD.
+my $media_info = new Mediainfo("filename" => "$file");
+
+if ($media_info->{width} < "960") {
+	$HD = "no";
+} else {
+	$HD = "yes";
+}
+
 # Output on screen the values that will be tagged. 
 if ($verbose && $automate != "1") {
 	print "\n************************************************************************\n";
@@ -284,6 +301,7 @@ if ($verbose && $automate != "1") {
 	print "Overview:\t$overview\n";
 	print "Artwork:\t" . $artwork . "\n";
 	print "Runtime:\t$runtime mins.\n";
+	print "High Def:\t$HD\n";
 	print "Kind:\t\t$kind\n";
 	print "Rating:\t\t$mpaa_rating\n";
 	print "Cast:\t\t$cast_list\n";
