@@ -31,6 +31,7 @@ my $logfile = "/Users/cade/movietags.log"; # Define location of log file for err
 
 # Determine the Title of the movie from the filename. 
 my $file = $ARGV[0];
+my $kind = "Movie";
 my $name;
 my $date;
 my ($filename, $directories) = fileparse("$file");
@@ -163,7 +164,7 @@ foreach my $title (@{$json_text->{results}}) {
 }
 
 if (!$automate) {
-	if (!$tmdb_id || $match > "1") {
+	if (!$tmdb_id || $match > "1" || !$release) {
 		if ($release) {
 			my $min_year = ($release - 2);
 			my $max_year = ($release + 2);
@@ -179,7 +180,7 @@ if (!$automate) {
 		}
 		
 		# If there is only 1 result just assume that it is the one we want.
-		if (scalar @closeTitles eq "1") {
+		if (scalar @closeTitles eq "1" && $release) {
 			$tmdb_id = $closeTitles[0]->{tmdb_id};
 		} else {
 			print "\nFilename: $file\n\n";
@@ -273,7 +274,6 @@ foreach my $country (@{$movie_releases->{countries}}) {
 	}	
 }
 
-my $kind = "Movie";
 # If the mpaa_rating comes back null then assign an Unrated tag to the movie. 
 # Not ideal but works for now. 
 if (!$mpaa_rating || $mpaa_rating eq "NR") {
