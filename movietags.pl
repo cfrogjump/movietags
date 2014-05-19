@@ -29,7 +29,7 @@ my $logfile = "/Users/cade/movietags.log"; # Define location of log file for err
 # DO NOT EDIT ANYTHING BLEOW THIS LINE.
 ######################################################################
 
-# Determine the Title of the movie from the filename. 
+# Determine the Title of the movie from the filename.
 my $file = $ARGV[0];
 my $kind = "Movie";
 my $name;
@@ -122,7 +122,7 @@ if (!@{$json_text->{results}}) {
 }
 
 # Process through the list of movies returned in the search and try to match based on file Title and Year. If no match is found
-# then revert to user input. 
+# then revert to user input.
 my $match = "0";
 foreach my $title (@{$json_text->{results}}) {
 	if ($debug) {
@@ -133,7 +133,7 @@ foreach my $title (@{$json_text->{results}}) {
 	if ($title->{title} =~ m/\//) {
 		$title->{title} =~ s/[#\-%\$*+():\/]/\ /g;
 	} else {
-		$title->{title} =~ s/[#\-%\$*+():]./\ /g;	
+		$title->{title} =~ s/[#\-%\$*+():]./\ /g;
 	}
 	$name =~ s/[#\-%\$*+():]./\ /g;
 	if ($title->{title} =~ m/[ \t]{2,}/) {
@@ -178,7 +178,7 @@ if (!$automate) {
 				push @closeTitles, {title => $cleanup->{title}, release_date => $cleanup->{release_date}, tmdb_id => $cleanup->{tmdb_id}};
 			}
 		}
-		
+
 		# If there is only 1 result just assume that it is the one we want.
 		if (scalar @closeTitles eq "1" && $release) {
 			$tmdb_id = $closeTitles[0]->{tmdb_id};
@@ -195,7 +195,7 @@ if (!$automate) {
 			$tmdb_id = $titles[$input]->{tmdb_id};
 		}
 	}
-} 
+}
 
 if ($match gt "1" && $automate eq "1") {
 	print "Unable to tag $file\n";
@@ -262,7 +262,7 @@ $movie_info->{overview} =~ s/\&amp\;/\&/g;
 $movie_info->{overview} =~ s/\;/\\\;/g;
 
 my $overview = $movie_info->{overview};
-my $art = 'http://d3gtl9l2a4fn1j.cloudfront.net/t/p/original' . $movie_info->{poster_path};
+my $art = 'http://image.tmdb.org/t/p/original' . $movie_info->{poster_path};
 my $ff = File::Fetch->new(uri => "$art");
 my $where = $ff->fetch() or die $ff->error;
 my $artwork = $ff->output_file;
@@ -271,11 +271,11 @@ my $movie_releases = $json->allow_nonref->utf8->relaxed->escape_slash->loose->al
 foreach my $country (@{$movie_releases->{countries}}) {
 	if ($country->{iso_3166_1} eq "US") {
 		$mpaa_rating = $country->{certification};
-	}	
+	}
 }
 
-# If the mpaa_rating comes back null then assign an Unrated tag to the movie. 
-# Not ideal but works for now. 
+# If the mpaa_rating comes back null then assign an Unrated tag to the movie.
+# Not ideal but works for now.
 if (!$mpaa_rating || $mpaa_rating eq "NR") {
 	$mpaa_rating = "Unrated";
 }
@@ -289,7 +289,7 @@ if ($media_info->{width} < "960") {
 	$HD = "yes";
 }
 
-# Output on screen the values that will be tagged. 
+# Output on screen the values that will be tagged.
 if ($verbose && $automate != "1") {
 	print "\n************************************************************************\n";
 	print "\n";
@@ -313,7 +313,7 @@ if ($verbose && $automate != "1") {
 	print "************************************************************************\n";
 }
 
-# Generate the actual MP4Tagger command. 
+# Generate the actual MP4Tagger command.
 $file =~ s/\ /\\\ /g;
 $file =~ s/\'/\\\'/g;
 $file =~ s/\(/\\\(/g;
@@ -359,11 +359,11 @@ if ($genres) {
 system("@command") == 0
 	or die "system @command failed: $?";
 
-# Cleanup after ourselves, removing downloaded artwork.	
+# Cleanup after ourselves, removing downloaded artwork.
 system("rm -f $artwork") == 0
 	or die "system rm failed: $?";
 
-# Set the files modification date to match the release date for sorting purposes. 
+# Set the files modification date to match the release date for sorting purposes.
 $release_date =~ s/-//g;
 $release_date = $release_date . "1200";
 system ("touch -t $release_date $file") == 0
