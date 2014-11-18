@@ -31,7 +31,8 @@ my $logfile = "/Users/cade/movietags.log"; # Define location of log file for err
 
 # Determine the Title of the movie from the filename.
 my $file = $ARGV[0];
-my $kind = "Movie";
+my $kind = "Short Film";
+#my $kind = "Movie";
 my $name;
 my $date;
 my ($filename, $directories) = fileparse("$file");
